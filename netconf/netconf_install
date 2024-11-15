@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-2.0-only
+
+build() {
+    add_checked_modules '/drivers/net/'
+
+    add_binary ip
+    add_binary '/usr/lib/initcpio/ipconfig' '/bin/ipconfig'
+
+    add_runscript
+}
+
+help() {
+    cat <<HELPEOF
+This hook configures network devices based on kernel parameters.
+The loopback device is automatically configured if the ip=
+parameter is set.
+
+Examples:
+
+ip=dhcp
+Configure the only available device using DHCP.
+
+ip=:::::eth0:dhcp
+Configure a specific device (eth0 in this case) using DHCP.
+
+ip=192.168.1.1:::::eth2:none
+Configure eth2 with a static IP.
+
+ip=ip=:::::eth0:dhcp:ip=192.168.1.1:::::eth1:none
+Configure multiple devices. Short format (ip=dhcp)
+is not allowed in this case, the device name must be specified.
+
+Kernel Parameters:
+
+ip=<client-ip>:<opt1>:<gw-ip>:<netmask>:<hostname>:<device>:<autoconf>
+
+<client-ip>
+IP address of the client.
+Default: Determined using autoconfiguration.
+
+<opt1>
+This option is irrelevant for this use case
+and should be left blank.
+
+<gw-ip>
+IP address of a gateway.
+Default: Determined using autoconfiguration.
+
+<netmask>
+Netmask for local network interface.
+Default: Determined using autoconfiguration.
+If unspecified the netmask is derived from the
+client IP address assuming classful addressing.
+
+<hostname>
+Name of the client.
+Default: Client IP address is used in ASCII notation.
+If a '.' character is present, anything before the first
+'.' is used as the client’s hostname, and anything after it
+is used as its NIS domain name.
+May be supplied by autoconfiguration, but its absence will
+not trigger autoconfiguration.
+If specified and DHCP is used, the user-provided hostname
+will be carried in the DHCP request; this may cause a DNS
+record to be created or updated for the client.
+
+<device>
+Name of network device to use.
+Default: If the host only has one device, it is used.
+Otherwise the device is determined using autoconfiguration.
+This is done by sending autoconfiguration requests out of
+all devices, and using the device that received the first reply.
+
+<autoconf>
+Method to use for autoconfiguration.
+Default: any
+In the case of options which specify multiple autoconfiguration
+protocols, requests are sent using all protocols, and the first
+one to reply is used.
+Only autoconfiguration protocols that have been compiled into
+the kernel will be used, regardless of the value of this option.
+The following methods are supported:
+off/none:   don't use autoconfiguration
+on/any:     use any protocol available in the kernel
+dhcp:       use DHCP
+bootp:      use BOOTP
+rarp:       use RARP
+both:       use both BOOTP and RARP but not DHCP
+
+netconf_timeout=<int>
+
+<int>
+Time in seconds to wait for an device to be configured.
+Default: 120
+If you are using DHCP, you may want to set this value lower
+to prevent the hook from prolonging the boot process if
+there are network issues.
+HELPEOF
+}
+
+# vim: set ft=sh ts=4 sw=4 et:

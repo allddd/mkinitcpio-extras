@@ -1,0 +1,42 @@
+#!/usr/bin/ash
+# SPDX-License-Identifier: GPL-2.0-only
+
+run_hook() {
+    local quiet
+
+    [ -n "${ip}" ] || {
+        msg ':: ip= parameter unset, nothing to configure'
+        return 0
+    }
+
+    msg ':: enabling loopback'
+    ip link set up lo
+
+    quiet="$(getarg quiet)"
+    printf '%s\n' "${ip}" | sed 's|^ip=||g ; s|:ip=|\n|g' | while read -r device; do
+        msg ":: enabling ip=${device}"
+        if [ "${quiet}" = 'y' ]; then
+            ipconfig -t "${netconf_timeout:-120}" "ip=${device}" 1>/dev/null
+        else
+            ipconfig -t "${netconf_timeout:-120}" "ip=${device}"
+        fi
+    done
+}
+
+run_cleanuphook() {
+    [ -n "${ip}" ] || {
+        msg ':: ip= parameter unset, nothing to clean up'
+        return 0
+    }
+
+    for device in $(ls -1 /tmp/net-*.conf 2>/dev/null | sed 's|\/tmp\/net\-\(.*\)\.conf|\1|g'); do
+        msg ":: disabling ${device}"
+        ip addr flush dev "${device}"
+        ip link set down "${device}"
+    done
+
+    msg ':: disabling loopback'
+    ip link set down lo
+}
+
+# vim: set ft=sh ts=4 sw=4 et:

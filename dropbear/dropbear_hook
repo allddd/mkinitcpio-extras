@@ -1,0 +1,20 @@
+#!/usr/bin/ash
+# SPDX-License-Identifier: GPL-2.0-only
+
+run_hook() {
+    local dropbear_port
+    ! [ -r /etc/dropbear/dropbear.initcpio ] || . <(awk '$1 ~ /^dropbear_port=[0-9]{1,5}$/' /etc/dropbear/dropbear.initcpio)
+
+    mount -m -t devpts devpts /dev/pts
+
+    dropbear -E -s -j -k -P /run/dropbear.pid -p "${dropbear_port:-222}"
+}
+
+run_cleanuphook() {
+    ! [ -r /run/dropbear.pid ] || kill "$(cat /run/dropbear.pid)"
+
+    umount /dev/pts
+    rm -rf /dev/pts
+}
+
+# vim: set ft=sh ts=4 sw=4 et:

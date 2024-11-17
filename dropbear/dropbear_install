@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-2.0-only
+
+host_keys() {
+    local dropbear_port dropbear_shell
+    local dropbear_keytypes=(
+        'rsa'
+        'ecdsa'
+        'ed25519'
+    )
+    source /etc/dropbear/dropbear.initcpio &>/dev/null || true
+
+    for key_type in "${dropbear_keytypes[@]}"; do
+        local key="/etc/dropbear/dropbear_${key_type}_host_key"
+
+        ! [[ -r "${key}" && -s "${key}" ]] || {
+            quiet 'found %s host key: %s' "${key_type}" "${key}"
+            continue
+        }
+
+        warning '%s host key missing, generating: %s' "${key_type}" "${key}"
+        dropbearkey -t "${key_type}" -f "${key}" 1>/dev/null || return 1
+    done
+}
+
+build() {
+    local dropbear_port dropbear_keytypes dropbear_shell
+    source /etc/dropbear/dropbear.initcpio &>/dev/null || true
+    local authorized_keys='/etc/dropbear/root_key'
+
+    [[ -r "${authorized_keys}" && -s "${authorized_keys}" ]] || {
+        error 'missing, empty or unreadable: %s' "${authorized_keys}"
+        return 1
+    }
+
+    host_keys || {
+        error 'unable to find/generate host keys'
+        return 1
+    }
+
+    [[ -z "${dropbear_shell}" ]] || {
+        quiet 'configuring shell for root'
+        printf 'root:x:0:0:root:/root:/bin/sh\n' | add_file - '/etc/passwd' 0644
+        printf 'root:*:::::::\n' | add_file - '/etc/shadow' 0400
+        printf 'root:x:0:\n' | add_file - '/etc/group' 0644
+    }
+
+    add_file '/dev/null' '/var/log/lastlog' 0664
+    add_file "${authorized_keys}" '/root/.ssh/authorized_keys' 0644
+
+    add_full_dir '/etc/dropbear'
+
+    add_checked_modules '/drivers/net/'
+
+    add_binary dropbear
+
+    add_runscript
+}
+
+help() {
+    cat <<HELPEOF
+This hook enables dropbear SSH server within initramfs.
+It does NOT provide a shell by default and is intended
+to be used in conjunction with other hooks, e.g. to
+remotely unlock a ZFS/LUKS encrypted root partition.
+However, this hook CAN configure a shell, see the
+configuration options below.
+
+Host keys, if not present when initramfs is regenerated, 
+are automatically generated using dropbearkey.
+If you want to use your own keys, place them in the
+following path: /etc/dropbear/dropbear_<type>_host_key
+Reusing host keys from your main SSH server is generally
+a bad idea, as it can make you vulnerable to MITM attacks.
+
+Password authentication is disabled, copy your existing
+authorized_keys file or place your keys in the following
+path: /etc/dropbear/root_key
+
+Options: 
+/etc/dropbear/dropbear.initcpio
+
+dropbear_port=
+Default: 222
+Non-standard port is used so that you can configure your
+SSH client to verify a different set of host keys for
+your main SSH server and this initramfs SSH server.
+
+dropbear_keytypes=()                (This is an array!)
+Default: rsa ecdsa ed25519
+If you wanted to remove RSA keys for some reason, you would
+put dropbear_keytypes=('ecdsa' 'ed25519') in the config file.
+Note that removing keys from the array does not remove them
+from the system; you must do this manually.
+
+dropbear_shell=
+Setting this option to any value instructs the hook to
+configure a shell for the root user.
+If this option is not present in the config file,
+no shell is configured.
+HELPEOF
+}
+
+# vim: set ft=sh ts=4 sw=4 et:

@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-2.0-only
+
+build() {
+    local tinyssh_port tinyssh_shell
+    source /etc/tinyssh/tinyssh.initcpio &>/dev/null || true
+    local authorized_keys='/etc/tinyssh/root_key'
+
+    [[ -r "${authorized_keys}" && -s "${authorized_keys}" ]] || {
+        error 'missing, empty or unreadable: %s' "${authorized_keys}"
+        return 1
+    }
+
+    [[ -d /etc/tinyssh/sshkeydir ]] || {
+        quiet 'generating host keys'
+        tinysshd-makekey /etc/tinyssh/sshkeydir || {
+            error 'unable to find/generate host keys'
+            return 1
+        }
+    }
+
+    [[ -z "${tinyssh_shell}" ]] || {
+        quiet 'configuring shell for root'
+        printf 'root:x:0:0:root:/root:/bin/sh\n' | add_file - '/etc/passwd' 0644
+        printf 'root:*:::::::\n' | add_file - '/etc/shadow' 0400
+        printf 'root:x:0:\n' | add_file - '/etc/group' 0644
+    }
+
+    add_file "${authorized_keys}" '/root/.ssh/authorized_keys' 0644
+
+    shopt -s dotglob
+    add_full_dir '/etc/tinyssh'
+    shopt -u dotglob
+
+    add_checked_modules '/drivers/net/'
+
+    map add_binary \
+        killall \
+        tinysshd
+
+    add_runscript
+}
+
+help() {
+    cat <<HELPEOF
+This hook enables tinyssh server within initramfs.
+It does NOT provide a shell by default and is intended
+to be used in conjunction with other hooks, e.g. to
+remotely unlock a ZFS/LUKS encrypted root partition.
+However, this hook CAN configure a shell, see the
+configuration options below.
+
+Host keys, if not present when initramfs is generated,
+are automatically generated using tinysshd-makekey.
+If you want to use your own keys, you must place them 
+in the following directory: /etc/tinyssh/sshkeydir
+Reusing host keys from your main SSH server is generally
+a bad idea, as it can make you vulnerable to MITM attacks.
+
+Password authentication is unsupported, copy your existing
+authorized_keys file or place your keys in the following
+path: /etc/tinyssh/root_key
+
+Options:
+/etc/tinyssh/tinyssh.initcpio
+
+tinyssh_port=
+Default: 222
+Non-standard port is used so that you can configure your
+SSH client to verify a different set of host keys for
+your main SSH server and this initramfs SSH server.
+
+tinyssh_shell=
+Setting this option to any value instructs the hook to
+configure a shell for the root user.
+If this option is not present in the config file,
+no shell is configured.
+HELPEOF
+}
+
+# vim: set ft=sh ts=4 sw=4 et:

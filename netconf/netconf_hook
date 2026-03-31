@@ -13,7 +13,7 @@ run_hook() {
     # with 'SIOCGIFFLAGS: No such device' when using ip=dhcp
     [ "${ip}" != "dhcp" ] || {
         ip=':::::eth0:dhcp'
-        msg ":: ip=dhcp is currenlty broken, replacing with ip=${ip} to avoid errors"
+        msg ":: ip=dhcp is currently broken, replacing with ip=${ip} to avoid errors"
     }
 
     msg ':: enabling loopback'

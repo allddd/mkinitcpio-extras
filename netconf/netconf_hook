@@ -29,10 +29,13 @@ run_cleanuphook() {
         return 0
     }
 
-    for device in $(ls -1 /tmp/net-*.conf 2>/dev/null | sed 's|\/tmp\/net\-\(.*\)\.conf|\1|g'); do
-        msg ":: disabling ${device}"
-        ip addr flush dev "${device}"
-        ip link set down "${device}"
+    for file in /run/net-*.conf; do
+        [ -e "$file" ] || continue
+        device=${file##*/net-}
+        device=${device%.conf}
+        msg ":: disabling $device"
+        ip addr flush dev "$device"
+        ip link set down "$device"
     done
 
     msg ':: disabling loopback'

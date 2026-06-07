@@ -9,13 +9,6 @@ run_hook() {
         return 0
     }
 
-    # workaround for the ipconfig bug that causes the network configuration to fail
-    # with 'SIOCGIFFLAGS: No such device' when using ip=dhcp
-    [ "${ip}" != "dhcp" ] || {
-        ip=':::::eth0:dhcp'
-        msg ":: ip=dhcp is currently broken, replacing with ip=${ip} to avoid errors"
-    }
-
     msg ':: enabling loopback'
     ip link set up lo
 
